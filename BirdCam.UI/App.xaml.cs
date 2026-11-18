@@ -174,7 +174,3 @@ public partial class App : System.Windows.Application
         await db.Database.ExecuteSqlRawAsync("PRAGMA journal_mode=WAL;");
     }
 }
-
-
-
-

@@ -56,6 +56,8 @@ dotnet build BirdCam.slnx
 dotnet run --project BirdCam.UI
 ```
 
+Без предупреждений декодера в консоли: `run-quiet.cmd` (см. раздел ниже).
+
 Модель можно получить так (нужен Python 3.12/3.13):
 
 ```powershell
@@ -146,6 +148,31 @@ BirdCam.UI.exe --screenshot settings --out C:\temp\settings.png
 
 Результаты: `logs\smoke.log`, `logs\ui-smoke.log`, `logs\birdcam-YYYYMMDD.log`.
 
+## Сообщения HEVC в консоли
+
+При старте с середины GOP декодер HEVC может писать в stderr:
+
+```text
+[hevc @ ...] Could not find ref with POC 28
+[hevc @ ...] Error constructing the frame RPS.
+```
+
+Это не ошибка потока: декодер ещё не получил опорные кадры и ждёт ближайший IDR,
+а FFmpeg включает concealment, поэтому картинка продолжает идти. Сообщения появляются
+при старте приложения и после переподключения камеры.
+
+Чтобы убрать их из консоли, переменные нужно задать **до запуска процесса** — OpenCV
+читает их при загрузке нативной библиотеки, поэтому из кода приложения это уже поздно:
+
+```powershell
+$env:OPENCV_FFMPEG_LOGLEVEL = "8"           # 8 = только фатальные, 24 = предупреждения
+$env:OPENCV_FFMPEG_CAPTURE_OPTIONS = "rtsp_transport;tcp"
+.\BirdCam.UI\bin\Debug\net10.0-windows\BirdCam.UI.exe
+```
+
+В корне репозитория лежит `run-quiet.cmd`, который делает это за вас. Чтобы не задавать
+переменные каждый раз, можно прописать их в системе (`setx OPENCV_FFMPEG_LOGLEVEL 8` и
+`setx OPENCV_FFMPEG_CAPTURE_OPTIONS "rtsp_transport;tcp"`) и перезапустить терминал/IDE.
 ## Ограничения
 
 - Одна камера и один RTSP-поток (архитектура легко расширяется).
@@ -164,6 +191,8 @@ BirdCam.UI.exe --screenshot settings --out C:\temp\settings.png
 - Интерфейс go2rtc без пароля по умолчанию — при необходимости ограничьте
   прослушивание `127.0.0.1` в его конфиге.
 - `settings.json` содержит токен бота; `birdcam.db` — историю наблюдений.
+
+
 
 
 
