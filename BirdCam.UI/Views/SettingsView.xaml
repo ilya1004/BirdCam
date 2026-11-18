@@ -12,6 +12,11 @@
             <Setter Property="MinWidth" Value="420" />
             <Setter Property="HorizontalAlignment" Value="Left" />
         </Style>
+        <Style x:Key="FieldCombo" TargetType="ComboBox" BasedOn="{StaticResource {x:Type ComboBox}}">
+            <Setter Property="MaxWidth" Value="680" />
+            <Setter Property="MinWidth" Value="420" />
+            <Setter Property="HorizontalAlignment" Value="Left" />
+        </Style>
         <Style x:Key="Row" TargetType="Grid">
             <Setter Property="Margin" Value="0,0,0,10" />
         </Style>
@@ -69,10 +74,12 @@
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
                         <TextBlock Grid.Column="0" Text="Модель (ONNX)" Style="{StaticResource FieldLabel}" />
-                        <TextBox Grid.Column="1" Style="{StaticResource FieldBox}" Text="{Binding ModelPath, UpdateSourceTrigger=LostFocus}" />
+                        <ComboBox Grid.Column="1"
+                                  AutomationProperties.Name="Модель"
+                                  Style="{StaticResource FieldCombo}"
+                                  ItemsSource="{Binding AvailableModels}"
+                                  SelectedItem="{Binding ModelPath, Mode=TwoWay}" />
                     </Grid>
-
-                    <TextBlock Text="{Binding ModelHint}" Style="{StaticResource Muted}" Margin="240,0,0,10" />
 
                     <Grid Style="{StaticResource Row}">
                         <Grid.ColumnDefinitions>
@@ -218,5 +225,6 @@
         </StackPanel>
     </ScrollViewer>
 </UserControl>
+
 
 

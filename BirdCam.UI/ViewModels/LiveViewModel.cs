@@ -138,6 +138,7 @@ public sealed partial class LiveViewModel : ObservableObject, IDisposable
             await _frames.StartAsync();
             _timer.Start();
             IsRunning = true;
+            ResolutionText = "подключение…";
             _status.Set("Поток запущен");
         }
         catch (Exception exception)
@@ -156,6 +157,7 @@ public sealed partial class LiveViewModel : ObservableObject, IDisposable
             await _frames.StopAsync();
             IsRunning = false;
             Frame = null;
+            _bitmap = null;
             ResolutionText = "поток остановлен";
             FpsText = string.Empty;
             _status.Set("Поток остановлен");
@@ -319,6 +321,11 @@ public sealed partial class LiveViewModel : ObservableObject, IDisposable
                 frame.Pixels,
                 frame.Stride,
                 0);
+
+            if (!ReferenceEquals(Frame, _bitmap))
+            {
+                Frame = _bitmap;
+            }
 
             ResolutionText = $"{_frames.Width}×{_frames.Height}";
         }

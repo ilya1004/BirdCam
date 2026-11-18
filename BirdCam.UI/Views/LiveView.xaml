@@ -10,15 +10,55 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <WrapPanel Grid.Row="0" Margin="0,0,0,14">
-            <Button Content="▶ Запустить" Command="{Binding StartCommand}" Style="{StaticResource AccentButton}" />
-            <Button Content="■ Стоп" Command="{Binding StopCommand}" />
-            <Button Content="Снимок" Command="{Binding SnapshotCommand}" />
-            <Button Content="Клип" Command="{Binding RecordClipCommand}" />
-            <ToggleButton Content="Автодетекция" IsChecked="{Binding IsDetectionEnabled}" />
-            <Button Content="В датасет" Command="{Binding AddToDatasetCommand}" />
-            <Button Content="В Telegram" Command="{Binding SendLastCommand}" />
-        </WrapPanel>
+        <StackPanel Grid.Row="0" Margin="0,0,0,12">
+            <Grid Margin="0,0,0,10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <Border Style="{StaticResource ToolbarCard}" Margin="0,0,10,0">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="ПОТОК" Style="{StaticResource ToolbarLabel}" />
+                        <Button Content="▶ Запустить" Command="{Binding StartCommand}" Style="{StaticResource AccentButton}" />
+                        <Button Content="■ Стоп" Command="{Binding StopCommand}" />
+                        <Ellipse Width="8" Height="8" VerticalAlignment="Center" Margin="4,0,0,0">
+                            <Ellipse.Style>
+                                <Style TargetType="Ellipse">
+                                    <Setter Property="Fill" Value="#5A6273" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsRunning}" Value="True">
+                                            <Setter Property="Fill" Value="{StaticResource AccentBrush}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Ellipse.Style>
+                        </Ellipse>
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Column="1" Style="{StaticResource ToolbarCard}" HorizontalAlignment="Left">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="ДЕТЕКЦИЯ" Style="{StaticResource ToolbarLabel}" />
+                        <ToggleButton Content="Автодетекция" IsChecked="{Binding IsDetectionEnabled}" />
+                        <TextBlock Text="{Binding DetectionStatus}"
+                                   Style="{StaticResource Muted}"
+                                   VerticalAlignment="Center"
+                                   Margin="6,0,4,0" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <Border Style="{StaticResource ToolbarCard}">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="СНИМКИ И КЛИПЫ" Style="{StaticResource ToolbarLabel}" />
+                    <Button Content="Снимок" Command="{Binding SnapshotCommand}" />
+                    <Button Content="Клип" Command="{Binding RecordClipCommand}" />
+                    <Button Content="В датасет" Command="{Binding AddToDatasetCommand}" />
+                    <Button Content="В Telegram" Command="{Binding SendLastCommand}" />
+                </StackPanel>
+            </Border>
+        </StackPanel>
 
         <Border Grid.Row="1" Background="#05070A" CornerRadius="14" ClipToBounds="True">
             <Grid>

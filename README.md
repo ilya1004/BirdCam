@@ -139,6 +139,9 @@ BirdCam.UI.exe --ui-smoke
 
 # открыть приложение сразу на нужной странице
 BirdCam.UI.exe --page gallery
+
+# оффскрин-рендер страницы в PNG (для документации)
+BirdCam.UI.exe --screenshot settings --out C:\temp\settings.png
 ```
 
 Результаты: `logs\smoke.log`, `logs\ui-smoke.log`, `logs\birdcam-YYYYMMDD.log`.
@@ -161,6 +164,7 @@ BirdCam.UI.exe --page gallery
 - Интерфейс go2rtc без пароля по умолчанию — при необходимости ограничьте
   прослушивание `127.0.0.1` в его конфиге.
 - `settings.json` содержит токен бота; `birdcam.db` — историю наблюдений.
+
 
 
 

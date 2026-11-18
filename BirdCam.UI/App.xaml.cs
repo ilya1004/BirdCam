@@ -62,6 +62,15 @@ public partial class App : System.Windows.Application
             var detector = _host.Services.GetRequiredService<IDetector>();
             await detector.InitializeAsync();
 
+            var screenshotPage = GetOption(e.Args, "--screenshot");
+            var screenshotPath = GetOption(e.Args, "--out");
+            if (!string.IsNullOrWhiteSpace(screenshotPage) && !string.IsNullOrWhiteSpace(screenshotPath))
+            {
+                var screenshotCode = Diagnostics.ScreenshotRunner.Run(_host.Services, layout, screenshotPage, screenshotPath);
+                Shutdown(screenshotCode);
+                return;
+            }
+
             if (e.Args.Contains("--ui-smoke", StringComparer.OrdinalIgnoreCase))
             {
                 var uiCode = Diagnostics.UiSmokeRunner.Run(_host.Services, layout);
@@ -165,6 +174,7 @@ public partial class App : System.Windows.Application
         await db.Database.ExecuteSqlRawAsync("PRAGMA journal_mode=WAL;");
     }
 }
+
 
 
 

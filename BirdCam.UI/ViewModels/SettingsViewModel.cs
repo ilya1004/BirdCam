@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.IO;
 using BirdCam.Application.Abstractions;
 using BirdCam.Application.Settings;
@@ -40,12 +41,12 @@ public sealed partial class SettingsViewModel : ObservableObject
         _logger = logger;
 
         LoadFrom(settings.Current);
-        ModelHint = BuildModelHint(layout);
+        RefreshAvailableModels();
     }
 
     public string StorageRoot => _layout.Root;
 
-    public string ModelHint { get; }
+    public ObservableCollection<string> AvailableModels { get; } = [];
 
     public string ModelStatus => _detector.Status;
 
@@ -157,6 +158,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             }
 
             _status.Set("Настройки сохранены");
+            RefreshAvailableModels();
             OnPropertyChanged(nameof(ModelStatus));
         }
         catch (Exception exception)
@@ -217,11 +219,11 @@ public sealed partial class SettingsViewModel : ObservableObject
     [RelayCommand]
     private void OpenDataFolder() => _dialogs.OpenFolder(_layout.Root);
 
-    private static string BuildModelHint(StorageLayout layout)
+    private void RefreshAvailableModels()
     {
         var names = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var directory in new[] { layout.Models, Path.Combine(AppContext.BaseDirectory, "models") })
+        foreach (var directory in new[] { _layout.Models, Path.Combine(AppContext.BaseDirectory, "models") })
         {
             if (!Directory.Exists(directory))
             {
@@ -234,7 +236,16 @@ public sealed partial class SettingsViewModel : ObservableObject
             }
         }
 
-        return names.Count > 0 ? "Доступны: " + string.Join(", ", names) : "Файлы .onnx не найдены";
+        if (!string.IsNullOrWhiteSpace(ModelPath))
+        {
+            names.Add(ModelPath.Trim());
+        }
+
+        AvailableModels.Clear();
+        foreach (var name in names)
+        {
+            AvailableModels.Add(name);
+        }
     }
 
     private void LoadFrom(AppSettings settings)
@@ -261,6 +272,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         FfmpegPath = settings.Recording.FfmpegPath;
     }
 }
+
 
 
 
