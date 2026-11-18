@@ -1,0 +1,31 @@
+# Build results
+bin/
+obj/
+[Bb]in/
+[Oo]bj/
+*.user
+*.suo
+.vs/
+.idea/
+*.DotSettings.user
+
+# Tooling
+.tools/
+tools/
+*.log
+
+# Models and datasets (large binaries)
+models/
+*.onnx
+*.pt
+*.zip
+
+# Local data (never commit)
+settings.json
+*.db
+*.db-shm
+*.db-wal
+
+# OS
+.DS_Store
+Thumbs.db

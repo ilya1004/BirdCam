@@ -1,0 +1,89 @@
+<UserControl x:Class="BirdCam.UI.Views.DatasetView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,12">
+            <TextBlock Text="Датасет" Style="{StaticResource H1}" />
+            <TextBlock Text="кадры и YOLO-разметка для дообучения модели"
+                       Style="{StaticResource Muted}"
+                       VerticalAlignment="Center"
+                       Margin="16,4,0,0" />
+        </StackPanel>
+
+        <WrapPanel Grid.Row="1" Margin="0,0,0,14">
+            <Button Content="Добавить текущий кадр" Command="{Binding AddSampleCommand}" Style="{StaticResource AccentButton}" />
+            <Button Content="Обновить" Command="{Binding RefreshCommand}" />
+            <Button Content="Открыть папку" Command="{Binding OpenFolderCommand}" />
+            <Button Content="Экспорт ZIP" Command="{Binding ExportCommand}" />
+        </WrapPanel>
+
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="280" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0" Margin="0,0,16,0">
+                <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+                    <StackPanel>
+                        <TextBlock Text="ВСЕГО ПРИМЕРОВ" Style="{StaticResource Muted}" FontSize="10" />
+                        <TextBlock Text="{Binding Total}" FontSize="30" FontWeight="SemiBold" Margin="0,2,0,0" />
+                        <TextBlock Text="ДОБАВЛЕНО СЕГОДНЯ" Style="{StaticResource Muted}" FontSize="10" Margin="0,10,0,0" />
+                        <TextBlock Text="{Binding Today}" FontSize="22" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}" Margin="0,2,0,0" />
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource Card}" Height="220">
+                    <Grid>
+                        <Image Source="{Binding LastImage}" Stretch="Uniform" />
+                        <TextBlock Text="пока нет примеров"
+                                   Style="{StaticResource Muted}"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   Visibility="{Binding LastImage, Converter={StaticResource NullToVis}}" />
+                    </Grid>
+                </Border>
+
+                <TextBlock Text="{Binding LastSampleText}" Style="{StaticResource Muted}" Margin="2,8,0,0" TextWrapping="Wrap" />
+            </StackPanel>
+
+            <Border Grid.Column="1" Style="{StaticResource Card}">
+                <StackPanel>
+                    <TextBlock Text="Как это работает" Style="{StaticResource H2}" />
+                    <TextBlock TextWrapping="Wrap" LineHeight="20" Foreground="{StaticResource TextBrush}">
+                        Каждый пример сохраняется в трёх видах: полный кадр (`images`), разметка YOLO (`labels`)
+                        и кроп с птицей (`crops`) — кропы удобны для обучения классификатора видов.
+                        Разметка пишется с классом 0 = bird, координаты нормализованы.
+                    </TextBlock>
+
+                    <TextBlock Text="Путь к датасету" Style="{StaticResource Muted}" Margin="0,16,0,4" />
+                    <TextBox Text="{Binding DatasetPath, Mode=OneWay}" IsReadOnly="True" />
+
+                    <TextBlock Text="Дообучение (пример команды)" Style="{StaticResource H2}" Margin="0,20,0,8" />
+                    <Border Background="#0B0E13" CornerRadius="8" Padding="12">
+                        <TextBlock FontFamily="Cascadia Mono, Consolas"
+                                   FontSize="12"
+                                   Foreground="#BFE9D3"
+                                   TextWrapping="Wrap"
+                                   xml:space="preserve">yolo detect train data=dataset/data.yaml model=yolo11n.pt epochs=80 imgsz=640
+yolo export model=runs/detect/train/weights/best.pt format=onnx opset=17</TextBlock>
+                    </Border>
+
+                    <TextBlock TextWrapping="Wrap" LineHeight="20" Margin="0,14,0,0" Style="{StaticResource Muted}">
+                        После экспорта положите best.onnx в папку models и укажите его в настройках.
+                        Для своей модели класс птицы обычно 0 — поменяйте «Классы птиц» на 0.
+                        Папка data.yaml создаётся автоматически при первом примере.
+                    </TextBlock>
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>
+

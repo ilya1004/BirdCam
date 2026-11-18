@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="BirdCam.Application/BirdCam.Application.csproj" />
+  <Project Path="BirdCam.Domain/BirdCam.Domain.csproj" />
+  <Project Path="BirdCam.Infrastructure/BirdCam.Infrastructure.csproj" />
+  <Project Path="BirdCam.Tests/BirdCam.Tests.csproj" />
+  <Project Path="BirdCam.UI/BirdCam.UI.csproj" />
+</Solution>
