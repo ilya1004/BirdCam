@@ -2,6 +2,7 @@ using BirdCam.Application.Abstractions;
 using BirdCam.Application.Storage;
 using BirdCam.Infrastructure.Capture;
 using BirdCam.Infrastructure.Detection;
+using BirdCam.Infrastructure.Go2Rtc;
 using BirdCam.Infrastructure.Persistence;
 using BirdCam.Infrastructure.Persistence.Repositories;
 using BirdCam.Infrastructure.Recording;
@@ -35,6 +36,7 @@ public static class DependencyInjection
 
         services.AddSingleton<IFrameSource, OpenCvFrameSource>();
         services.AddSingleton<IDetector, OnnxBirdDetector>();
+        services.AddSingleton<IGo2RtcManager, Go2RtcManager>();
 
         return services;
     }

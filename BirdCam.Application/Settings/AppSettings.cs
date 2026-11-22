@@ -29,6 +29,15 @@ public sealed class CameraSettings
 
     /// <summary>Ширина кадра для отображения (полный кадр используется для снимков и детекции).</summary>
     public int DisplayWidth { get; set; } = 1280;
+
+    /// <summary>Путь к go2rtc.exe. Пусто — автопоиск в PATH и типовых папках.</summary>
+    public string Go2RtcPath { get; set; } = string.Empty;
+
+    /// <summary>HTTP API go2rtc для проверки доступности.</summary>
+    public string Go2RtcApiUrl { get; set; } = "http://127.0.0.1:1984";
+
+    /// <summary>Запускать go2rtc вместе с приложением и останавливать при выходе.</summary>
+    public bool ManageGo2Rtc { get; set; } = true;
 }
 
 public sealed class StorageSettings

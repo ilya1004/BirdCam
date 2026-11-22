@@ -34,6 +34,22 @@
                                 </Style>
                             </Ellipse.Style>
                         </Ellipse>
+
+                        <TextBlock Text="{Binding Go2RtcStatusText}"
+                                   FontSize="11"
+                                   VerticalAlignment="Center"
+                                   Margin="8,0,4,0">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Foreground" Value="{StaticResource DangerBrush}" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsGo2RtcAvailable}" Value="True">
+                                            <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
                     </StackPanel>
                 </Border>
 

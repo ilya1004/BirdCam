@@ -16,6 +16,7 @@ public sealed partial class SettingsViewModel : ObservableObject
     private readonly IDetector _detector;
     private readonly IFrameSource _frames;
     private readonly ITelegramNotifier _telegram;
+    private readonly IGo2RtcManager _go2Rtc;
     private readonly StorageLayout _layout;
     private readonly IDialogService _dialogs;
     private readonly StatusService _status;
@@ -26,6 +27,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         IDetector detector,
         IFrameSource frames,
         ITelegramNotifier telegram,
+        IGo2RtcManager go2Rtc,
         StorageLayout layout,
         IDialogService dialogs,
         StatusService status,
@@ -35,6 +37,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         _detector = detector;
         _frames = frames;
         _telegram = telegram;
+        _go2Rtc = go2Rtc;
         _layout = layout;
         _dialogs = dialogs;
         _status = status;
@@ -55,6 +58,15 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     [ObservableProperty]
     private int _displayWidth = 1280;
+
+    [ObservableProperty]
+    private string _go2RtcPath = string.Empty;
+
+    [ObservableProperty]
+    private string _go2RtcApiUrl = "http://127.0.0.1:1984";
+
+    [ObservableProperty]
+    private bool _manageGo2Rtc = true;
 
     [ObservableProperty]
     private bool _autoStart = true;
@@ -113,7 +125,10 @@ public sealed partial class SettingsViewModel : ObservableObject
                 {
                     RtspUrl = RtspUrl.Trim(),
                     AutoStart = AutoStart,
-                    DisplayWidth = Math.Clamp(DisplayWidth, 640, 1920)
+                    DisplayWidth = Math.Clamp(DisplayWidth, 640, 1920),
+                    Go2RtcPath = Go2RtcPath.Trim(),
+                    Go2RtcApiUrl = Go2RtcApiUrl.Trim(),
+                    ManageGo2Rtc = ManageGo2Rtc
                 },
                 Storage = new StorageSettings { RootPath = previous.Storage.RootPath },
                 Detection = new DetectionSettings
@@ -181,6 +196,13 @@ public sealed partial class SettingsViewModel : ObservableObject
         var wasRunning = _frames.IsRunning;
         try
         {
+            var go2RtcStatus = await _go2Rtc.EnsureAvailableAsync();
+            if (!go2RtcStatus.Available)
+            {
+                _status.Error(go2RtcStatus.Message);
+                return;
+            }
+
             if (!wasRunning)
             {
                 await _frames.StartAsync();
@@ -203,6 +225,16 @@ public sealed partial class SettingsViewModel : ObservableObject
             {
                 await _frames.StopAsync();
             }
+        }
+    }
+
+    [RelayCommand]
+    private void PickGo2Rtc()
+    {
+        var path = _dialogs.PickFile("go2rtc.exe|go2rtc.exe|Все файлы|*.*");
+        if (!string.IsNullOrWhiteSpace(path))
+        {
+            Go2RtcPath = path;
         }
     }
 
@@ -253,6 +285,9 @@ public sealed partial class SettingsViewModel : ObservableObject
         RtspUrl = settings.Camera.RtspUrl;
         DisplayWidth = settings.Camera.DisplayWidth;
         AutoStart = settings.Camera.AutoStart;
+        Go2RtcPath = settings.Camera.Go2RtcPath;
+        Go2RtcApiUrl = settings.Camera.Go2RtcApiUrl;
+        ManageGo2Rtc = settings.Camera.ManageGo2Rtc;
 
         TelegramToken = settings.Telegram.BotToken;
         TelegramChatId = settings.Telegram.ChatId;
@@ -272,6 +307,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         FfmpegPath = settings.Recording.FfmpegPath;
     }
 }
+
 
 
 

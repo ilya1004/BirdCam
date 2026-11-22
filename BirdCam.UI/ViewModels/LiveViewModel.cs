@@ -27,12 +27,17 @@ public sealed partial class LiveViewModel : ObservableObject, IDisposable
     private readonly IFileStorage _storage;
     private readonly ITelegramNotifier _telegram;
     private readonly IDetectionRepository _detectionRepository;
+    private readonly IGo2RtcManager _go2Rtc;
     private readonly StatusService _status;
     private readonly ILogger<LiveViewModel> _logger;
     private readonly DispatcherTimer _timer;
     private readonly DispatcherTimer _overlayTimer;
+    private readonly DispatcherTimer _go2RtcTimer;
 
     private WriteableBitmap? _bitmap;
+    private DateTime _lastGo2RtcStartAttempt = DateTime.MinValue;
+    private bool _go2RtcCheckInProgress;
+    private bool _go2RtcErrorReported;
 
     public LiveViewModel(
         IFrameSource frames,
@@ -45,6 +50,7 @@ public sealed partial class LiveViewModel : ObservableObject, IDisposable
         IFileStorage storage,
         ITelegramNotifier telegram,
         IDetectionRepository detections,
+        IGo2RtcManager go2Rtc,
         StatusService status,
         ILogger<LiveViewModel> logger)
     {
@@ -58,6 +64,7 @@ public sealed partial class LiveViewModel : ObservableObject, IDisposable
         _storage = storage;
         _telegram = telegram;
         _detectionRepository = detections;
+        _go2Rtc = go2Rtc;
         _status = status;
         _logger = logger;
 
@@ -74,6 +81,10 @@ public sealed partial class LiveViewModel : ObservableObject, IDisposable
             Detections = [];
         };
 
+        _go2RtcTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
+        _go2RtcTimer.Tick += async (_, _) => await CheckGo2RtcAsync();
+        _go2RtcTimer.Start();
+
         _watcher.BirdObserved += OnBirdObserved;
 
         IsRunning = _frames.IsRunning;
@@ -85,6 +96,7 @@ public sealed partial class LiveViewModel : ObservableObject, IDisposable
         }
 
         _ = RefreshTodayAsync();
+        _ = CheckGo2RtcAsync();
     }
 
     public event EventHandler? MediaAdded;
@@ -125,6 +137,12 @@ public sealed partial class LiveViewModel : ObservableObject, IDisposable
     private DetectedBird[] _detections = [];
 
     [ObservableProperty]
+    private string _go2RtcStatusText = "go2rtc: проверка…";
+
+    [ObservableProperty]
+    private bool _isGo2RtcAvailable;
+
+    [ObservableProperty]
     private string? _lastSnapshotPath;
 
     [ObservableProperty]
@@ -135,6 +153,15 @@ public sealed partial class LiveViewModel : ObservableObject, IDisposable
     {
         try
         {
+            var go2RtcStatus = await _go2Rtc.EnsureAvailableAsync();
+            ApplyGo2RtcStatus(go2RtcStatus);
+
+            if (!go2RtcStatus.Available)
+            {
+                _status.Error(go2RtcStatus.Message);
+                return;
+            }
+
             await _frames.StartAsync();
             _timer.Start();
             IsRunning = true;
@@ -274,6 +301,7 @@ public sealed partial class LiveViewModel : ObservableObject, IDisposable
     {
         _timer.Stop();
         _overlayTimer.Stop();
+        _go2RtcTimer.Stop();
         _watcher.BirdObserved -= OnBirdObserved;
     }
 
@@ -355,6 +383,56 @@ public sealed partial class LiveViewModel : ObservableObject, IDisposable
         }));
     }
 
+    private async Task CheckGo2RtcAsync()
+    {
+        if (_go2RtcCheckInProgress)
+        {
+            return;
+        }
+
+        _go2RtcCheckInProgress = true;
+        try
+        {
+            Go2RtcStatus status;
+            if (DateTime.UtcNow - _lastGo2RtcStartAttempt > TimeSpan.FromSeconds(15))
+            {
+                _lastGo2RtcStartAttempt = DateTime.UtcNow;
+                status = await _go2Rtc.EnsureAvailableAsync();
+            }
+            else
+            {
+                status = await _go2Rtc.CheckAsync();
+            }
+
+            ApplyGo2RtcStatus(status);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogDebug(exception, "Ошибка проверки доступности go2rtc");
+        }
+        finally
+        {
+            _go2RtcCheckInProgress = false;
+        }
+    }
+
+    private void ApplyGo2RtcStatus(Go2RtcStatus status)
+    {
+        IsGo2RtcAvailable = status.Available;
+        Go2RtcStatusText = status.Available ? "go2rtc: работает" : "go2rtc: недоступен";
+
+        if (!status.Available && !_go2RtcErrorReported)
+        {
+            _go2RtcErrorReported = true;
+            _status.Error(status.Message);
+        }
+        else if (status.Available && _go2RtcErrorReported)
+        {
+            _go2RtcErrorReported = false;
+            _status.Set(status.Message);
+        }
+    }
+
     private async Task RefreshTodayAsync()
     {
         try
@@ -369,6 +447,7 @@ public sealed partial class LiveViewModel : ObservableObject, IDisposable
         }
     }
 }
+
 
 
 

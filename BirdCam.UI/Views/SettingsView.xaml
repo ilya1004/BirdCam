@@ -56,6 +56,34 @@
                         <TextBox Grid.Column="1" Style="{StaticResource FieldBox}" Text="{Binding DisplayWidth, UpdateSourceTrigger=LostFocus}" />
                     </Grid>
 
+                    <Grid Style="{StaticResource Row}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="240" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="go2rtc.exe" Style="{StaticResource FieldLabel}" />
+                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                            <TextBox Style="{StaticResource FieldBox}" MinWidth="380" Text="{Binding Go2RtcPath, UpdateSourceTrigger=PropertyChanged}" />
+                            <Button Content="…" Command="{Binding PickGo2RtcCommand}" Margin="8,0,0,0" />
+                        </StackPanel>
+                    </Grid>
+
+                    <Grid Style="{StaticResource Row}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="240" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="API go2rtc" Style="{StaticResource FieldLabel}" />
+                        <TextBox Grid.Column="1" Style="{StaticResource FieldBox}" Text="{Binding Go2RtcApiUrl, UpdateSourceTrigger=LostFocus}" />
+                    </Grid>
+
+                    <CheckBox Content="Запускать go2rtc вместе с приложением и закрывать при выходе"
+                              IsChecked="{Binding ManageGo2Rtc}" />
+                    <TextBlock Text="Если путь к go2rtc.exe пуст, приложение ищет его в PATH и типовых папках."
+                               Style="{StaticResource Muted}"
+                               Margin="0,4,0,8"
+                               TextWrapping="Wrap" />
+
                     <CheckBox Content="Запускать поток при старте приложения" IsChecked="{Binding AutoStart}" />
                     <Button Content="Проверить камеру"
                             Command="{Binding TestCameraCommand}"

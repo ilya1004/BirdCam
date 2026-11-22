@@ -78,6 +78,18 @@ public partial class App : System.Windows.Application
                 return;
             }
 
+            var go2rtc = _host.Services.GetRequiredService<IGo2RtcManager>();
+            var go2RtcStatus = await go2rtc.EnsureAvailableAsync();
+            _host.Services.GetRequiredService<StatusService>().Set(go2RtcStatus.Message);
+
+            if (!go2RtcStatus.Available)
+            {
+                _host.Services
+                    .GetRequiredService<ILoggerFactory>()
+                    .CreateLogger("go2rtc")
+                    .LogWarning("{Message}", go2RtcStatus.Message);
+            }
+
             if (e.Args.Contains("--smoke", StringComparer.OrdinalIgnoreCase))
             {
                 var exitCode = await Diagnostics.SmokeRunner.RunAsync(_host.Services, layout, e.Args);
@@ -88,7 +100,7 @@ public partial class App : System.Windows.Application
             var settings = settingsProvider.Current;
             var frames = _host.Services.GetRequiredService<IFrameSource>();
 
-            if (settings.Camera.AutoStart)
+            if (settings.Camera.AutoStart && go2RtcStatus.Available)
             {
                 await frames.StartAsync();
 
@@ -139,6 +151,12 @@ public partial class App : System.Windows.Application
                 if (watcher is not null)
                 {
                     watcher.DisposeAsync().AsTask().GetAwaiter().GetResult();
+                }
+
+                var go2rtc = _host.Services.GetService<IGo2RtcManager>();
+                if (go2rtc is not null)
+                {
+                    go2rtc.StopManagedAsync().GetAwaiter().GetResult();
                 }
 
                 _host.StopAsync(TimeSpan.FromSeconds(3)).GetAwaiter().GetResult();
