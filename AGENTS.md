@@ -13,6 +13,8 @@ BirdCam — Windows-приложение (WPF, .NET 10) для наблюден�
 - найденные птицы складываются в датасет (изображение + YOLO-разметка + кроп);
 - события и файлы хранятся в SQLite;
 - фото/видео могут отправляться в Telegram;
+- на вкладке «Обучение» датасет дообучается через ultralytics, а `best.onnx`
+  устанавливается как активная модель;
 - go2rtc запускается и останавливается вместе с приложением.
 
 Пользовательский интерфейс и сообщения — на русском, код и имена — на английском.
@@ -30,10 +32,12 @@ dotnet run --project BirdCam.UI
 - Windows 10/11, .NET 10 SDK;
 - ffmpeg (winget-версия находится автоматически, путь можно задать в настройках);
 - go2rtc (`go2rtc.exe`; приложение умеет запускать его само);
-- ONNX-модель в `models/` — веса в репозиторий не коммитятся.
+- ONNX-модель в `models/` — веса в репозиторий не коммитятся;
+- для обучения — Python 3.12/3.13 с `ultralytics`, `onnx`, `onnxslim`, `onnxruntime`
+  (`.tools\venv` или `training\venv`; путь можно задать в настройках).
 
 Данные и логи: `%LOCALAPPDATA%\BirdCam\`
-(`settings.json`, `birdcam.db`, `media\`, `dataset\`, `models\`, `logs\`).
+(`settings.json`, `birdcam.db`, `media\`, `dataset\`, `training\`, `models\`, `logs\`).
 
 ## 3. Структура решения
 
@@ -41,9 +45,9 @@ dotnet run --project BirdCam.UI
 |---|---|---|
 | `BirdCam.Domain` | Domain | сущности, enum'ы, `VideoFrame`, `BoundingBox`; без внешних зависимостей |
 | `BirdCam.Application` | Application | интерфейсы, сценарии, настройки, letterbox/NMS, YOLO-разметка; без OpenCV/EF/Telegram |
-| `BirdCam.Infrastructure` | Infrastructure | OpenCV, ONNX Runtime, EF Core + SQLite, ffmpeg, Telegram.Bot, go2rtc, JSON-настройки, логи |
-| `BirdCam.UI` | UI | WPF + MVVM (CommunityToolkit.Mvvm), DI через Generic Host, страницы и ViewModels |
-| `BirdCam.Tests` | Tests | xUnit-тесты чистой логики (без камеры и сети) |
+| `BirdCam.Infrastructure` | Infrastructure | OpenCV, ONNX Runtime, EF Core + SQLite, ffmpeg, Telegram.Bot, go2rtc, запуск ultralytics, JSON-настройки, логи |
+| `BirdCam.UI` | UI | WPF + MVVM (CommunityToolkit.Mvvm), DI через Generic Host, страницы и ViewModels, вкладка обучения |
+| `BirdCam.Tests` | Tests | xUnit-тесты чистой логики (без камеры и сети), сплита датасета и разбора ONNX-метаданных |
 
 Ключевые файлы:
 
@@ -52,8 +56,15 @@ dotnet run --project BirdCam.UI
 - `BirdCam.Infrastructure/Detection/OnnxBirdDetector.cs` — ONNX + DirectML;
 - `BirdCam.Infrastructure/Go2Rtc/Go2RtcManager.cs` — жизненный цикл go2rtc;
 - `BirdCam.Application/Services/BirdWatcher.cs` — фоновая детекция и датасет;
+- `BirdCam.Application/Services/TrainingService.cs` — сценарий обучения и установка модели;
+- `BirdCam.Infrastructure/Training/TrainingDataService.cs` — аудит датасета и train/val;
+- `BirdCam.Infrastructure/Training/UltralyticsTrainingRunner.cs` — Python-процесс обучения;
+- `BirdCam.Infrastructure/Training/TrainingScript.cs` — встроенный `train.py`;
+- `BirdCam.UI/ViewModels/TrainingViewModel.cs` — вкладка «Обучение»;
 - `BirdCam.UI/ViewModels/SettingsViewModel.cs` — сохранение настроек;
-- `BirdCam.UI/Views/*.xaml` — страницы.
+- `BirdCam.UI/Views/*.xaml` — страницы;
+- `docs/training.md` — гайд по обучению (локально, вручную, Colab);
+- `docs/training-colab.ipynb` — готовый блокнот Colab.
 
 ## 4. Архитектурные правила
 
@@ -76,6 +87,16 @@ dotnet run --project BirdCam.UI
    `[1, 4 + classes, N]`. Экспорт `nms=False` (`[1, 300, 6]`) не поддерживается.
    Класс птицы задаётся настройкой `BirdClassIds` (COCO — `14`, своя модель — обычно `0`).
 10. Датасет: класс `0 = bird`, координаты нормализованы; кропы — для классификатора видов.
+11. Обучение: `TrainingDataService` делает сплит по времени (последние
+    `ValidationPercent` кадров — val), пропускает файлы без рамок и пишет
+    `data.yaml` **без `path`** + относительные `./images/...` в `train.txt`/`val.txt`.
+    Так датасет переносим и работает в Colab. Не возвращать абсолютные пути.
+12. Python-процесс обучения запускается только через `ITrainingRunner`, с рабочей
+    папкой `training`, `TQDM_DISABLE=1`, UTF-8 stdout и прогрессом по строкам
+    `BIRDCAM:{json}`. Отменять/закрывать процесс нужно kill'ом дерева; при выходе
+    приложения runner убивает только свой процесс.
+13. Python ищется в настройках, `training/venv`, `.tools/venv` (вверх по дереву
+    от exe), PATH и `py -3.13`. Не хардкодить путь к `.tools`.
 
 ## 5. Соглашения кода
 
@@ -99,9 +120,14 @@ BirdCam.UI.exe --smoke --image C:\temp\bird.jpg     # детекция на ка
 BirdCam.UI.exe --ui-smoke                           # загрузка всех страниц XAML + overlay
 BirdCam.UI.exe --page gallery                       # открыть страницу
 BirdCam.UI.exe --screenshot settings --out C:\temp\settings.png
+BirdCam.UI.exe --training-check                     # датасет + Python/ultralytics
+BirdCam.UI.exe --training-check --training-smoke     # одна эпоха 320px, проверка тракта
+BirdCam.UI.exe --training-check --training-ui --epochs 1 --imgsz 320 --batch 4 --workers 0
+BirdCam.UI.exe --training-check --install C:\path\best.onnx
 ```
 
-Результаты: `%LOCALAPPDATA%\BirdCam\logs\smoke.log`, `ui-smoke.log`, `birdcam-YYYYMMDD.log`.
+Результаты: `%LOCALAPPDATA%\BirdCam\logs\smoke.log`, `ui-smoke.log`, `training-check.log`,
+`training-ui.log`, `birdcam-YYYYMMDD.log`.
 
 `run-quiet.cmd` задаёт `OPENCV_FFMPEG_LOGLEVEL=8` и `OPENCV_FFMPEG_CAPTURE_OPTIONS=rtsp_transport;tcp`
 **до** запуска процесса: OpenCV читает их при загрузке нативной библиотеки, поэтому из кода
@@ -113,8 +139,11 @@ BirdCam.UI.exe --screenshot settings --out C:\temp\settings.png
 2. `dotnet test BirdCam.Tests/BirdCam.Tests.csproj` — все тесты зелёные.
 3. Если затронут XAML/UI — `--ui-smoke`.
 4. Если затронуты захват/детекция/клипы/датасет — `--smoke` (нужны go2rtc и камера).
-5. Если менялось поведение — обновить `README.md`.
-6. Не коммитить `models/`, `.tools/`, `bin/`, `obj/`, `settings.json`, `*.db`.
+5. Если затронуто обучение — `--training-check`; для изменений раннера —
+   `--training-check --training-ui --epochs 1 --imgsz 320 --batch 4 --workers 0`
+   (полные 40 эпох в проверку не запускать).
+6. Если менялось поведение — обновить `README.md`; для обучения — `docs/training.md`.
+7. Не коммитить `models/`, `.tools/`, `bin/`, `obj/`, `settings.json`, `*.db`.
 
 ## 8. Частые грабли
 
@@ -133,6 +162,20 @@ BirdCam.UI.exe --screenshot settings --out C:\temp\settings.png
   `yolo export model=yolo26m.pt format=onnx opset=18 imgsz=640`.
 - **Telegram** принимает видео до 50 МБ; клипы пишутся в H.264/AAC.
 - **FFmpeg-путь** ищется в настройках, PATH и winget — не хардкодить.
+- **Обучение на CPU.** PyTorch на Windows/AMD не использует GPU: ~40 с/эпоха
+  при 640px и 328 кадрах. Не обещать ускорение через DirectML.
+- **`trainer.loss_items`** в ultralytics 8.4 — словарь, а не тензор. В `train.py`
+  усреднять значения через `mean_loss`, иначе callback падает с `'dict' object
+  has no attribute 'mean'`.
+- **ONNX-метаданные `names`.** Ultralytics пишет Python-dict с кириллицей;
+  разбирать `YoloLabels.ParseNames`, не `JSON.parse`. В консоли Windows кириллица
+  может выглядеть как `????`, проверять байты/через детектор.
+- **Датасет и Colab.** `data.yaml` без `path` + `./images/...` в списках — обязательное
+  условие переносимости. Абсолютные пути ломают Colab.
+- **Один класс.** Автосбор пишет только `0 = bird`; «синица» — это имя класса,
+  а не многоклассовая модель. Не утверждать, что модель различает другие виды.
+- **Пустые labels.** Пропускаются при сплите; в датасете могут быть битые HEVC-кадры
+  (серый шум) — это нормально, обучение их не берёт.
 
 ## 9. Git
 

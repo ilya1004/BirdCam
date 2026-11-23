@@ -12,6 +12,8 @@
 - Снимки в JPEG и клипы в MP4 (H.264/AAC) через ffmpeg.
 - Автодетекция YOLO26m ONNX: DirectML (AMD/NVIDIA/Intel) или CPU.
 - Датасет: кадры, YOLO-разметка и кропы птиц; статистика и экспорт в ZIP.
+- Обучение вида: вкладка «Обучение» готовит train/val, запускает ultralytics
+  и устанавливает `best.onnx`; локально или в Colab.
 - Галерея: просмотр, открытие файла/папки, удаление, отправка в Telegram.
 - SQLite: история файлов, детекций и примеров датасета.
 
@@ -69,21 +71,23 @@ Telegram: создайте бота у [@BotFather](https://t.me/BotFather), у�
 ├── logs\                       логи
 ├── media\                      snapshots, clips, thumbs
 ├── models\                     ONNX-модели
-└── dataset\                    data.yaml, images, labels, crops
+├── training\                   train.py, runs, logs
+└── dataset\                    data.yaml, train/val.txt, images, labels, crops
 ```
 
-## Дообучение
+## Обучение вида
 
-Датасет совместим с ultralytics:
+Вкладка **«Обучение»**: проверка датасета → «Подготовить сплит» → параметры →
+«Начать обучение» → «Установить и использовать». Приложение само готовит
+`train.txt`/`val.txt` и `data.yaml`, запускает ultralytics в отдельном процессе
+и переключает детектор на новый `best.onnx` (класс птицы = `0`).
 
-```powershell
-cd %LOCALAPPDATA%\BirdCam\dataset
-yolo detect train data=data.yaml model=yolo26m.pt epochs=80 imgsz=640
-yolo export model=runs/detect/train/weights/best.pt format=onnx opset=18
-```
+Подробный гайд, ручные команды и обучение в Colab — в [docs/training.md](docs/training.md).
+Датасет совместим с ultralytics: `data.yaml` содержит относительные списки
+`train.txt`/`val.txt`, поэтому папку можно распаковать где угодно. Кропы из
+`crops\` — задел для классификатора нескольких видов.
 
-Положите `best.onnx` в `models`, выберите его в настройках и укажите
-«Классы птиц» = `0`. Кропы из `crops\` удобны для обучения классификатора видов.
+![Обучение](docs/training.png)
 
 ## Диагностика
 
@@ -92,6 +96,8 @@ BirdCam.UI.exe --smoke                                  # кадр → дете�
 BirdCam.UI.exe --smoke --image C:\temp\bird.jpg         # детекция на картинке
 BirdCam.UI.exe --ui-smoke                               # проверка загрузки страниц XAML
 BirdCam.UI.exe --page gallery                           # открыть нужную страницу
+BirdCam.UI.exe --training-check                         # датасет + Python/ultralytics
+BirdCam.UI.exe --training-check --training-smoke         # одна эпоха 320px
 ```
 
 Результаты пишутся в `%LOCALAPPDATA%\BirdCam\logs`.
@@ -103,7 +109,11 @@ BirdCam.UI.exe --page gallery                           # открыть нуж�
   или переменными `OPENCV_FFMPEG_LOGLEVEL=8` и `OPENCV_FFMPEG_CAPTURE_OPTIONS=rtsp_transport;tcp`
   **до** запуска процесса.
 - Одна камера и один поток. COCO-модель различает класс «bird», но не вид —
-  для видов нужно дообучение на своих кропах.
+  обученная на вкладке «Обучение» модель знает только тот вид, которым назван
+  класс `0` (для текущего датасета — синица).
+- При переключении на COCO-модель верните «Классы птиц» = `14`; у своей модели — `0`.
+- Обучение на этом ПК идёт на CPU (PyTorch не использует DirectML): ~40 с/эпоха
+  при 640px и 328 кадрах. Для GPU используйте Colab (см. `docs/training.md`).
 - Если go2rtc уже запущен вручную, приложение использует его и не закрывает при выходе.
   Останавливается только экземпляр, запущенный самим BirdCam.
 - Токен Xiaomi в go2rtc периодически истекает; Telegram принимает видео до 50 МБ.
