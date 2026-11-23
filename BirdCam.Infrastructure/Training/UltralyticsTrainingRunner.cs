@@ -181,9 +181,7 @@ public sealed partial class UltralyticsTrainingRunner : ITrainingRunner, IDispos
                 TrainingPhase.Setup,
                 $"Python {environment.PythonVersion}, ultralytics {environment.UltralyticsVersion}, " +
                 (environment.CudaAvailable
-                    ? (string.IsNullOrWhiteSpace(environment.HipVersion)
-                        ? "GPU"
-                        : $"GPU/ROCm {environment.HipVersion}")
+                    ? (string.IsNullOrWhiteSpace(environment.GpuName) ? "GPU" : environment.GpuName)
                     : "CPU") + ". Запуск…"));
 
             var stdout = PumpAsync(process.StandardOutput, state, progress, log, cancellationToken);
