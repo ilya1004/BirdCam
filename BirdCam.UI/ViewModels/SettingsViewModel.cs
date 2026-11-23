@@ -80,8 +80,21 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private bool _autoSendPhotos = true;
 
-    [ObservableProperty]
-    private string _modelPath = "yolo11n.onnx";
+    private string _modelPath = "yolo26m.onnx";
+
+    public string ModelPath
+    {
+        get => _modelPath;
+        set
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return;
+            }
+
+            SetProperty(ref _modelPath, value.Trim());
+        }
+    }
 
     [ObservableProperty]
     private bool _useGpu = true;
@@ -119,54 +132,98 @@ public sealed partial class SettingsViewModel : ObservableObject
         try
         {
             var previous = _settings.Current;
+            var previousCamera = previous.Camera ?? new CameraSettings();
+            var previousDetection = previous.Detection ?? new DetectionSettings();
+            var previousStorage = previous.Storage ?? new StorageSettings();
+
+            var rtspUrl = Clean(RtspUrl);
+            if (rtspUrl.Length == 0)
+            {
+                rtspUrl = Clean(previousCamera.RtspUrl);
+            }
+
+            if (rtspUrl.Length == 0)
+            {
+                rtspUrl = "rtsp://127.0.0.1:8554/c200";
+            }
+
+            var modelPath = Clean(ModelPath);
+            if (modelPath.Length == 0)
+            {
+                modelPath = Clean(previousDetection.ModelPath);
+            }
+
+            if (modelPath.Length == 0)
+            {
+                modelPath = "yolo26m.onnx";
+            }
+
+            var storageRoot = Clean(previousStorage.RootPath);
+            if (storageRoot.Length == 0)
+            {
+                storageRoot = StorageSettings.DefaultStorageRoot;
+            }
+
+            var birdClassIds = Clean(BirdClassIds);
+            if (birdClassIds.Length == 0)
+            {
+                birdClassIds = "14";
+            }
+
+            var go2RtcApiUrl = Clean(Go2RtcApiUrl);
+            if (go2RtcApiUrl.Length == 0)
+            {
+                go2RtcApiUrl = "http://127.0.0.1:1984";
+            }
+
             var settings = new AppSettings
             {
                 Camera = new CameraSettings
                 {
-                    RtspUrl = RtspUrl.Trim(),
+                    RtspUrl = rtspUrl,
                     AutoStart = AutoStart,
                     DisplayWidth = Math.Clamp(DisplayWidth, 640, 1920),
-                    Go2RtcPath = Go2RtcPath.Trim(),
-                    Go2RtcApiUrl = Go2RtcApiUrl.Trim(),
+                    Go2RtcPath = Clean(Go2RtcPath),
+                    Go2RtcApiUrl = go2RtcApiUrl,
                     ManageGo2Rtc = ManageGo2Rtc
                 },
-                Storage = new StorageSettings { RootPath = previous.Storage.RootPath },
+                Storage = new StorageSettings { RootPath = storageRoot },
                 Detection = new DetectionSettings
                 {
                     AutoStart = DetectionAutoStart,
                     IntervalMs = Math.Clamp(IntervalMs, 200, 10_000),
                     ConfidenceThreshold = Math.Clamp(Confidence, 0.01, 0.99),
-                    BirdClassIds = BirdClassIds.Trim(),
+                    BirdClassIds = birdClassIds,
                     InputSize = Math.Clamp(InputSize, 320, 1280),
                     UseGpu = UseGpu,
                     CooldownSeconds = Math.Clamp(CooldownSeconds, 5, 3600),
                     MaxSamplesPerDay = Math.Clamp(MaxSamplesPerDay, 10, 100_000),
-                    ModelPath = ModelPath.Trim()
+                    ModelPath = modelPath
                 },
                 Telegram = new TelegramSettings
                 {
-                    BotToken = TelegramToken.Trim(),
-                    ChatId = TelegramChatId.Trim(),
+                    BotToken = Clean(TelegramToken),
+                    ChatId = Clean(TelegramChatId),
                     AutoSendPhotos = AutoSendPhotos
                 },
                 Recording = new RecordingSettings
                 {
                     ClipDurationSeconds = Math.Clamp(ClipDurationSeconds, 3, 120),
-                    FfmpegPath = FfmpegPath.Trim()
+                    FfmpegPath = Clean(FfmpegPath)
                 }
             };
 
             await _settings.SaveAsync(settings);
             await _detector.InitializeAsync();
 
-            if (!string.Equals(previous.Camera.RtspUrl, settings.Camera.RtspUrl, StringComparison.OrdinalIgnoreCase)
+            if (!string.Equals(previousCamera.RtspUrl, settings.Camera.RtspUrl, StringComparison.OrdinalIgnoreCase)
                 && _frames.IsRunning)
             {
                 await _frames.StopAsync();
                 await _frames.StartAsync();
             }
 
-            if (!string.Equals(previous.Storage.RootPath, settings.Storage.RootPath, StringComparison.OrdinalIgnoreCase))
+            if (!string.Equals(previousStorage.RootPath, settings.Storage.RootPath, StringComparison.OrdinalIgnoreCase))
             {
                 _status.Set("Настройки сохранены. Для смены папки данных перезапустите приложение.");
                 return;
@@ -273,12 +330,24 @@ public sealed partial class SettingsViewModel : ObservableObject
             names.Add(ModelPath.Trim());
         }
 
-        AvailableModels.Clear();
+        foreach (var existing in AvailableModels.ToList())
+        {
+            if (!names.Contains(existing))
+            {
+                AvailableModels.Remove(existing);
+            }
+        }
+
         foreach (var name in names)
         {
-            AvailableModels.Add(name);
+            if (!AvailableModels.Any(item => string.Equals(item, name, StringComparison.OrdinalIgnoreCase)))
+            {
+                AvailableModels.Add(name);
+            }
         }
     }
+
+    private static string Clean(string? value) => value?.Trim() ?? string.Empty;
 
     private void LoadFrom(AppSettings settings)
     {
