@@ -81,7 +81,8 @@ internal static class TrainingCheckRunner
             var environment = await training.DetectEnvironmentAsync();
             Write($"python: {(environment.IsReady ? "OK" : "FAIL")} — {environment.Message}");
             Write($"python path: {environment.PythonPath}");
-            Write($"ultralytics: {environment.UltralyticsVersion}, torch: {environment.TorchVersion}, cuda={environment.CudaAvailable}");
+            Write($"ultralytics: {environment.UltralyticsVersion}, torch: {environment.TorchVersion}, gpu_available={environment.CudaAvailable}");
+            Write($"gpu: {environment.GpuName}, hip: {environment.HipVersion}");
 
             exitCode = audit.HasUsableImages && environment.IsReady ? 0 : 1;
             Write(exitCode == 0 ? "RESULT: OK" : "RESULT: FAIL");
@@ -132,7 +133,7 @@ internal static class TrainingCheckRunner
 
             if (args.Contains("--training-smoke", StringComparer.OrdinalIgnoreCase) && exitCode == 0)
             {
-                Write("training-smoke: 1 эпоха, 320px, batch 4");
+                Write($"training-smoke: 1 эпоха, 320px, batch 4, device={(environment.CudaAvailable ? "0" : "cpu")}");
                 var runName = "smoke-" + DateTime.Now.ToString("yyyyMMdd-HHmmss");
                 var progress = new InlineProgress<TrainingProgress>(item =>
                     Write((item.IsLog ? "log: " : $"progress[{item.Phase}] ") + item.Message));
@@ -145,7 +146,7 @@ internal static class TrainingCheckRunner
                         Epochs: 1,
                         ImageSize: 320,
                         Batch: 4,
-                        Device: "cpu",
+                        Device: environment.CudaAvailable ? "0" : "cpu",
                         Workers: 0,
                         ExportOnnx: true),
                     progress);

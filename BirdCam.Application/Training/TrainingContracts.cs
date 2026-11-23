@@ -51,7 +51,9 @@ public sealed record TrainingEnvironment(
     string TorchVersion,
     bool CudaAvailable,
     int CpuThreads,
-    string Message);
+    string Message,
+    string GpuName = "",
+    string HipVersion = "");
 
 /// <summary>Параметры запуска обучения.</summary>
 public sealed record TrainingRunOptions(

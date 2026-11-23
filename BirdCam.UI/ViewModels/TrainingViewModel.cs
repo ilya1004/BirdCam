@@ -398,7 +398,7 @@ public sealed partial class TrainingViewModel : ObservableObject
             return;
         }
 
-        var className = ParseClassNames().FirstOrDefault() ?? "синица";
+        var className = ParseClassNames().FirstOrDefault(name => !string.IsNullOrWhiteSpace(name)) ?? "синица";
         if (!_dialogs.Confirm(
                 $"Установить {Path.GetFileName(_lastOnnxPath)} и использовать её для детекции?\n\n" +
                 $"Класс птицы будет переключён на 0, модель — на новый файл."))
@@ -463,18 +463,24 @@ public sealed partial class TrainingViewModel : ObservableObject
         try
         {
             var classes = ParseClassNames();
-            var className = classes.FirstOrDefault() ?? "синица";
+            var className = classes.FirstOrDefault(name => !string.IsNullOrWhiteSpace(name)) ?? "синица";
             var model = SelectedModel?.Path ?? "yolo26n.pt";
             var python = string.IsNullOrWhiteSpace(PythonPath) ? "python" : PythonPath;
+            var yolo = Path.Combine(Path.GetDirectoryName(python) ?? string.Empty, "yolo.exe");
+            if (!File.Exists(yolo))
+            {
+                yolo = "yolo";
+            }
+
             var runName = $"{TrainingSlug.From(className)}-{DateTime.Now:yyyyMMdd-HHmmss}";
             var command = string.Join(
                 Environment.NewLine,
                 $"cd \"{_layout.Dataset}\"",
-                $"& \"{python}\" \"{Path.Combine(_training.TrainingDirectory, TrainingScriptFileName)}\" `",
-                $"  --data \"{Path.Combine(_layout.Dataset, "data.yaml")}\" `",
-                $"  --model \"{model}\" `",
-                $"  --run-name {runName} --epochs {Epochs} --imgsz {ImageSize} --batch {Batch} --device {Device} --workers {Workers} `",
-                $"  --project \"{_layout.TrainingRuns}\"");
+                $"& \"{yolo}\" detect train `",
+                $"  data=\"{Path.Combine(_layout.Dataset, "data.yaml")}\" `",
+                $"  model=\"{model}\" `",
+                $"  epochs={Epochs} imgsz={ImageSize} batch={Batch} device={Device} workers={Workers} `",
+                $"  project=\"{_layout.TrainingRuns}\" name={runName}");
 
             Clipboard.SetText(command);
             _status.Set("Команда обучения скопирована в буфер обмена");
@@ -630,8 +636,26 @@ public sealed partial class TrainingViewModel : ObservableObject
         PythonVersion = environment.PythonVersion;
         TorchVersion = environment.TorchVersion;
         UltralyticsVersion = environment.UltralyticsVersion;
-        EnvironmentDetail = $"Потоков CPU: {environment.CpuThreads} · " +
-                            (environment.CudaAvailable ? "CUDA доступна" : "обучение на CPU (DirectML не используется)");
+
+        if (environment.CudaAvailable)
+        {
+            var gpuName = string.IsNullOrWhiteSpace(environment.GpuName) ? "GPU" : environment.GpuName;
+            EnvironmentDetail = $"GPU: {gpuName} · torch {environment.TorchVersion} · потоков CPU: {environment.CpuThreads}";
+            if (string.Equals(Device, "cpu", StringComparison.OrdinalIgnoreCase))
+            {
+                Device = "0";
+                AppendLog("Обнаружена GPU: устройство обучения переключено на 0.");
+            }
+        }
+        else
+        {
+            EnvironmentDetail = $"Потоков CPU: {environment.CpuThreads} · обучение на CPU (GPU не найдена)";
+            if (string.Equals(Device, "0", StringComparison.OrdinalIgnoreCase))
+            {
+                Device = "cpu";
+                AppendLog("GPU не найдена: устройство обучения переключено на cpu.");
+            }
+        }
 
         if (!string.IsNullOrWhiteSpace(environment.PythonPath))
         {
@@ -939,8 +963,6 @@ public sealed partial class TrainingViewModel : ObservableObject
     partial void OnIsBusyChanged(bool value) => StartTrainingCommand.NotifyCanExecuteChanged();
 
     partial void OnIsEnvironmentReadyChanged(bool value) => StartTrainingCommand.NotifyCanExecuteChanged();
-
-    private const string TrainingScriptFileName = "train.py";
 }
 
 /// <summary>Пункт списка .pt-моделей для дообучения.</summary>

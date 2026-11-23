@@ -58,6 +58,7 @@ public sealed partial class UltralyticsTrainingRunner : ITrainingRunner, IDispos
         }
 
         TrainingEnvironment? partial = null;
+        var ready = new List<TrainingEnvironment>();
         var errors = new List<string>();
 
         foreach (var candidate in candidates)
@@ -73,7 +74,15 @@ public sealed partial class UltralyticsTrainingRunner : ITrainingRunner, IDispos
             var environment = probe.ToEnvironment();
             if (environment.IsReady)
             {
-                return environment;
+                // GPU-окружение важнее уже найденного CPU: обучение должно идти на видеокарте.
+                if (environment.CudaAvailable)
+                {
+                    return environment;
+                }
+
+                ready.Add(environment);
+                partial ??= environment;
+                continue;
             }
 
             partial ??= environment;
@@ -81,6 +90,11 @@ public sealed partial class UltralyticsTrainingRunner : ITrainingRunner, IDispos
             {
                 errors.Add($"{candidate.Display}: {probe.Error}");
             }
+        }
+
+        if (ready.Count > 0)
+        {
+            return ready[0];
         }
 
         if (partial is not null)
@@ -166,7 +180,11 @@ public sealed partial class UltralyticsTrainingRunner : ITrainingRunner, IDispos
             progress?.Report(new TrainingProgress(
                 TrainingPhase.Setup,
                 $"Python {environment.PythonVersion}, ultralytics {environment.UltralyticsVersion}, " +
-                (environment.CudaAvailable ? "CUDA" : "CPU") + ". Запуск…"));
+                (environment.CudaAvailable
+                    ? (string.IsNullOrWhiteSpace(environment.HipVersion)
+                        ? "GPU"
+                        : $"GPU/ROCm {environment.HipVersion}")
+                    : "CPU") + ". Запуск…"));
 
             var stdout = PumpAsync(process.StandardOutput, state, progress, log, cancellationToken);
             var stderr = PumpAsync(process.StandardError, state, progress, log, cancellationToken);
@@ -612,10 +630,14 @@ public sealed partial class UltralyticsTrainingRunner : ITrainingRunner, IDispos
 
         yield return new PythonCandidate(
             Path.Combine(_layout.TrainingVenv, "Scripts", "python.exe"), [], "обучение/venv");
+        yield return new PythonCandidate(
+            Path.Combine(_layout.Training, "rocm-venv", "Scripts", "python.exe"), [], "обучение/rocm-venv");
 
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
         for (var depth = 0; depth < 8 && directory is not null; depth++, directory = directory.Parent)
         {
+            yield return new PythonCandidate(
+                Path.Combine(directory.FullName, ".tools", "rocm-venv", "Scripts", "python.exe"), [], ".tools/rocm-venv");
             yield return new PythonCandidate(
                 Path.Combine(directory.FullName, ".tools", "venv", "Scripts", "python.exe"), [], ".tools/venv");
             yield return new PythonCandidate(
@@ -706,7 +728,9 @@ public sealed partial class UltralyticsTrainingRunner : ITrainingRunner, IDispos
                 GetString(root, "ultralytics"),
                 root.TryGetProperty("cuda", out var cuda) && cuda.ValueKind == JsonValueKind.True,
                 GetInt(root, "threads", Environment.ProcessorCount),
-                GetString(root, "ultralytics_error") ?? GetString(root, "torch_error"));
+                GetString(root, "ultralytics_error") ?? GetString(root, "torch_error"),
+                GetString(root, "gpu"),
+                GetString(root, "hip"));
         }
         catch (OperationCanceledException)
         {
@@ -878,14 +902,19 @@ public sealed partial class UltralyticsTrainingRunner : ITrainingRunner, IDispos
         string? UltralyticsVersion,
         bool CudaAvailable,
         int CpuThreads,
-        string? Error)
+        string? Error,
+        string? GpuName = null,
+        string? HipVersion = null)
     {
         public TrainingEnvironment ToEnvironment()
         {
             var ready = !string.IsNullOrWhiteSpace(UltralyticsVersion) && !string.IsNullOrWhiteSpace(TorchVersion);
+            var rocm = TorchVersion?.Split("+rocm", StringSplitOptions.RemoveEmptyEntries).ElementAtOrDefault(1);
+            var backend = CudaAvailable
+                ? $"{GpuName ?? "GPU"}{(string.IsNullOrWhiteSpace(rocm) ? string.Empty : $" · ROCm {rocm}")}"
+                : "CPU";
             var message = ready
-                ? $"Python {PythonVersion ?? "?"} · ultralytics {UltralyticsVersion} · torch {TorchVersion} · " +
-                  (CudaAvailable ? "CUDA" : "CPU")
+                ? $"Python {PythonVersion ?? "?"} · ultralytics {UltralyticsVersion} · torch {TorchVersion} · {backend}"
                 : PythonVersion is null
                     ? "Python не запустился: " + (Error ?? "неизвестная ошибка")
                     : $"Python {PythonVersion}: ultralytics/torch не установлены" +
@@ -899,7 +928,9 @@ public sealed partial class UltralyticsTrainingRunner : ITrainingRunner, IDispos
                 TorchVersion ?? "—",
                 CudaAvailable,
                 CpuThreads > 0 ? CpuThreads : Environment.ProcessorCount,
-                message);
+                message,
+                GpuName ?? string.Empty,
+                HipVersion ?? string.Empty);
         }
     }
 
@@ -969,11 +1000,14 @@ public sealed partial class UltralyticsTrainingRunner : ITrainingRunner, IDispos
     private const string PythonProbeScript = """
 import json, os, platform, sys
 info = {"executable": sys.executable, "python": platform.python_version(), "threads": os.cpu_count() or 0,
-        "torch": None, "ultralytics": None, "cuda": False}
+        "torch": None, "ultralytics": None, "cuda": False, "gpu": None, "hip": None}
 try:
     import torch
     info["torch"] = torch.__version__
     info["cuda"] = bool(torch.cuda.is_available())
+    info["hip"] = getattr(torch.version, "hip", None)
+    if info["cuda"]:
+        info["gpu"] = torch.cuda.get_device_name(0)
 except Exception as exc:
     info["torch_error"] = str(exc)
 try:

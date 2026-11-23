@@ -13,6 +13,7 @@ public static class TrainingScript
 import argparse
 import json
 import os
+import platform
 import sys
 import traceback
 from pathlib import Path
@@ -86,8 +87,9 @@ def main():
 
     try:
         from ultralytics import YOLO
+        import torch
     except Exception as exc:
-        emit("error", message="ultralytics import failed: " + str(exc), traceback=traceback.format_exc())
+        emit("error", message="ultralytics/torch import failed: " + str(exc), traceback=traceback.format_exc())
         return 3
 
     emit("start", epochs=args.epochs, model=str(args.model), device=str(args.device), data=str(data_path))
@@ -128,6 +130,9 @@ def main():
     model.add_callback("on_train_epoch_end", on_train_epoch_end)
 
     device = str(args.device)
+    # AMP на Windows/ROCm пока нестабилен: для HIP-сборок обучаем в FP32.
+    is_hip = bool(getattr(getattr(torch, "version", None), "hip", None))
+    use_amp = device.lower() != "cpu" and not (platform.system() == "Windows" and is_hip)
     try:
         results = model.train(
             data=str(data_path),
@@ -147,7 +152,7 @@ def main():
             cache=False,
             save=True,
             val=True,
-            amp=device.lower() != "cpu",
+            amp=use_amp,
         )
     except Exception as exc:
         emit("error", message=str(exc), traceback=traceback.format_exc())

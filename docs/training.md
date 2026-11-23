@@ -52,9 +52,10 @@ BirdCam умеет дообучать YOLO на датасете, который
    - `yolo26n.pt` — быстрый старт;
    - эпох `40` (можно 60–80, если качество не устроит);
    - размер входа `640`;
-   - batch `8`;
+   - batch `8` для CPU или `16` для GPU;
    - workers `2`;
-   - устройство `cpu` (для этого ПК; `0` — CUDA, если появится NVIDIA).
+   - устройство: `0` — GPU (AMD ROCm или NVIDIA CUDA), `cpu` — без видеокарты.
+     Если GPU доступна, приложение подставит `0` автоматически.
 5. Нажмите **«Начать обучение»** и следите за журналом и метриками
    `mAP50`, `mAP50-95`, `P`, `R`. Кнопка **«Остановить»** завершает процесс.
 6. Когда появится результат, нажмите **«Установить и использовать»**:
@@ -73,18 +74,75 @@ BirdCam умеет дообучать YOLO на датасете, который
 
 ### Сколько это занимает
 
-На этом ПК (Ryzen 7 7700, 16 потоков, PyTorch CPU) один прогон 328 кадров при
-`imgsz=640` занимает около 40–45 секунд. 40 эпох — примерно 30–40 минут.
-При `imgsz=320` эпоха занимает ~15 секунд, но качество на мелких птицах ниже.
+На этом ПК (Ryzen 7 7700, 16 потоков) один прогон 328 кадров при `imgsz=640`:
 
-AMD Radeon для обучения не используется: PyTorch на Windows не умеет ROCm,
-а DirectML применяется только для инференса. Если нужно быстро — обучайте в
-Colab на GPU (вариант 3).
+| Окружение | Первая эпоха | Следующие эпохи | 40 эпох |
+|---|---|---|---|
+| CPU, PyTorch CPU | ~42 с | ~42 с | ~30–35 мин |
+| GPU, RX 7800 XT + ROCm 10.2 | ~60 с (MIOpen warmup) | ~7–8 с | ~6–8 мин |
+
+При `imgsz=320` эпоха на GPU занимает ещё меньше, но качество на мелких птицах
+ниже. GPU-обучение проверено на Windows 11 с Adrenalin 32.0.32029.2010,
+Python 3.13, PyTorch 2.15.0+rocm10.2.0 и ultralytics 8.4.216. DirectML для
+обучения не используется — нужен именно ROCm-сборка PyTorch.
+
+> На Windows/ROCm автоматический AMP отключён в `train.py`: с включённым AMP
+> MIOpen в этой связке даёт сломанные метрики (mAP падает до ~0.17), хотя loss
+> выглядит нормально. Без AMP обучение идёт в FP32 и метрики корректные.
+
+## GPU AMD (ROCm) на Windows
+
+Официальная инструкция AMD:
+[Install PyTorch for ROCm](https://rocm.docs.amd.com/projects/ai-ecosystem/en/latest/frameworks/pytorch/install.html)
+и [TheRock releases](https://github.com/ROCm/TheRock/blob/main/RELEASES.md).
+Для RX 7800 XT нужен `gfx1101`, extra `device-gfx1101`.
+
+Требования: Windows 11, свежий Adrenalin, 64-битный Python 3.13, ~2 ГБ на диске.
+Ставить лучше в отдельное окружение, не ломая CPU-venv:
+
+```powershell
+cd C:\Users\ilyar\Projects\BirdCam
+py -3.13 -m venv .tools\rocm-venv
+.\.tools\rocm-venv\Scripts\python.exe -m pip install --upgrade pip
+
+# PyTorch + ROCm 10.2 (около 1.5 ГБ)
+.\.tools\rocm-venv\Scripts\python.exe -m pip install `
+  --index-url https://stable.repo.amd.com/rocm/whl-next/ `
+  "torch[device-gfx1101]" "torchvision[device-gfx1101]"
+
+# ultralytics и экспорт
+.\.tools\rocm-venv\Scripts\python.exe -m pip install ultralytics onnx onnxslim onnxruntime
+```
+
+Проверка:
+
+```powershell
+.\.tools\rocm-venv\Scripts\python.exe -c `
+  "import torch; print(torch.__version__, torch.cuda.is_available(), torch.cuda.get_device_name(0), torch.version.hip)"
+```
+
+Ожидаемо: `2.15.0+rocm10.2.0 True AMD Radeon RX 7800 XT ...`.
+
+Дальше в BirdCam откройте **«Обучение»** и нажмите **«Проверить»**. Приложение
+само найдёт `.tools\rocm-venv` (или укажите путь к `python.exe` вручную),
+покажет `GPU: AMD Radeon RX 7800 XT` и подставит устройство `0`. Запускайте
+обучение как обычно.
+
+Если GPU не видна:
+
+- проверьте, что установлен именно `torch[...]` из индекса AMD, а не CPU-сборка
+  с PyPI: `python -m pip show torch` должен содержать `+rocm10.2.0`;
+- обновите драйвер Adrenalin;
+- `torch.cuda.device_count()` может вернуть 2 (встройка + дискретная); BirdCam
+  использует `device=0`, это RX 7800 XT. При необходимости задайте
+  `HIP_VISIBLE_DEVICES=0`;
+- предупреждения MIOpen в первую эпоху — нормальная инициализация, не ошибка.
 
 ## Вариант 2: вручную, ultralytics на этом ПК
 
 Окружение уже есть в `.tools\venv` (Python 3.13, ultralytics 8.4, torch CPU).
-Если его нет:
+Для GPU используйте `.tools\rocm-venv` (см. раздел «GPU AMD»). Если окружения
+нет:
 
 ```powershell
 cd C:\Users\ilyar\Projects\BirdCam
@@ -112,6 +170,9 @@ cd $env:LOCALAPPDATA\BirdCam\dataset
 
 Скопируйте `best.onnx` в `%LOCALAPPDATA%\BirdCam\models`, выберите его в
 «Настройках» и укажите «Классы птиц» = `0`.
+
+Для GPU в этой же команде замените путь к `yolo.exe` на `.tools\rocm-venv\Scripts\yolo.exe`,
+а `device=cpu` — на `device=0`.
 
 `data.yaml` намеренно **не содержит `path`**: ultralytics берёт папку самого
 yaml, а `train.txt`/`val.txt` содержат относительные пути `./images/...`.
@@ -185,7 +246,10 @@ BirdCam.UI.exe --training-check --install "C:\...\best.onnx"
 | Симптом | Причина и решение |
 |---|---|
 | «Python с ultralytics не найден» | Установите Python 3.12/3.13, создайте venv и поставьте `ultralytics onnx onnxslim onnxruntime`; укажите путь к `python.exe` в блоке «Окружение». |
-| `torch` есть, но обучение медленное | На Windows с AMD PyTorch работает только на CPU. Это нормально; используйте Colab для GPU. |
+| `torch` есть, но обучение медленное | На CPU это нормально; для RX 7800 XT установите ROCm-сборку PyTorch (раздел «GPU AMD») и `device=0`. |
+| GPU есть, но `torch.cuda.is_available()` = False | Установлена CPU-сборка torch с PyPI. Переустановите из `https://stable.repo.amd.com/rocm/whl-next/` с `[device-gfx1101]`. |
+| Метрики на GPU около 0.1–0.2 mAP, хотя loss падает | Включён AMP на Windows/ROCm. BirdCam уже отключает AMP для HIP; в ручных командах добавьте `amp=False`. |
+| MIOpen warnings/error при старте | Первая инициализация MIOpen на Windows; обычно не влияет. Обновите Adrenalin и ROCm-сборку. |
 | `ultralytics import failed` | Пакет не установлен в выбранном Python. Проверьте путь и `pip list`. |
 | `No labels found` / `class ... not found` | Нажмите «Подготовить сплит»; проверьте, что названий классов не меньше, чем максимальный класс в `labels`. |
 | Метрики высокие, а на новых кадрах плохо | Валидация — последние кадры того же дня и той же сцены. Проверяйте на новом дне/другом освещении; добавьте данные. |

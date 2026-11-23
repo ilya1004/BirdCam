@@ -75,6 +75,7 @@ public sealed class TrainingDataServiceTests : IDisposable
         Assert.Equal(8, train.Length);
         Assert.Equal(2, val.Length);
         Assert.Empty(train.Intersect(val, StringComparer.OrdinalIgnoreCase));
+        Assert.StartsWith("./images/", train[0], StringComparison.OrdinalIgnoreCase);
         Assert.EndsWith("20260101_120900_000_000009.jpg", val[^1], StringComparison.OrdinalIgnoreCase);
         Assert.Equal(new DateTimeOffset(new DateTime(2026, 1, 1, 12, 8, 0)), result.ValFirstAt);
 
@@ -82,6 +83,7 @@ public sealed class TrainingDataServiceTests : IDisposable
         Assert.Contains("train: 'train.txt'", yaml);
         Assert.Contains("val: 'val.txt'", yaml);
         Assert.Contains("0: 'синица'", yaml);
+        Assert.DoesNotContain("path:", yaml);
     }
 
     [Fact]

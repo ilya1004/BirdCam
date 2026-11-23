@@ -34,7 +34,9 @@ dotnet run --project BirdCam.UI
 - go2rtc (`go2rtc.exe`; приложение умеет запускать его само);
 - ONNX-модель в `models/` — веса в репозиторий не коммитятся;
 - для обучения — Python 3.12/3.13 с `ultralytics`, `onnx`, `onnxslim`, `onnxruntime`
-  (`.tools\venv` или `training\venv`; путь можно задать в настройках).
+  (`.tools\venv` или `training\venv`; путь можно задать в настройках);
+- для GPU AMD — ROCm-сборка PyTorch в `.tools\rocm-venv`:
+  `torch[device-gfx1101]` из `https://stable.repo.amd.com/rocm/whl-next/`.
 
 Данные и логи: `%LOCALAPPDATA%\BirdCam\`
 (`settings.json`, `birdcam.db`, `media\`, `dataset\`, `training\`, `models\`, `logs\`).
@@ -95,8 +97,9 @@ dotnet run --project BirdCam.UI
     папкой `training`, `TQDM_DISABLE=1`, UTF-8 stdout и прогрессом по строкам
     `BIRDCAM:{json}`. Отменять/закрывать процесс нужно kill'ом дерева; при выходе
     приложения runner убивает только свой процесс.
-13. Python ищется в настройках, `training/venv`, `.tools/venv` (вверх по дереву
-    от exe), PATH и `py -3.13`. Не хардкодить путь к `.tools`.
+13. Python ищется в настройках, `training/venv`, `training/rocm-venv`, `.tools/rocm-venv`,
+    `.tools/venv` (вверх по дереву от exe), PATH и `py -3.13`. GPU-окружение
+    предпочтительнее CPU; не хардкодить путь к `.tools`.
 
 ## 5. Соглашения кода
 
@@ -162,8 +165,15 @@ BirdCam.UI.exe --training-check --install C:\path\best.onnx
   `yolo export model=yolo26m.pt format=onnx opset=18 imgsz=640`.
 - **Telegram** принимает видео до 50 МБ; клипы пишутся в H.264/AAC.
 - **FFmpeg-путь** ищется в настройках, PATH и winget — не хардкодить.
-- **Обучение на CPU.** PyTorch на Windows/AMD не использует GPU: ~40 с/эпоха
-  при 640px и 328 кадрах. Не обещать ускорение через DirectML.
+- **Обучение на GPU AMD.** На Windows работает ROCm-сборка PyTorch из
+  `.tools\rocm-venv` (`torch[device-gfx1101]`, ROCm 10.2, проверено на RX 7800 XT).
+  DirectML для обучения не используется. На CPU ~40 с/эпоха, на GPU ~7–8 с/эпоха
+  после MIOpen warmup. Не обещать CUDA-путь на AMD.
+- **AMP на Windows/ROCm.** С включённым AMP метрики ломаются (mAP ~0.1–0.2 при
+  нормальном loss). `train.py` принудительно выключает AMP для HIP; не возвращать
+  `amp=True` без проверки.
+- **MIOpen.** В первой эпохе возможны предупреждения `ParseAndLoadDb`/`EvaluateInvokers`
+  и долгий warmup; это не ошибка обучения.
 - **`trainer.loss_items`** в ultralytics 8.4 — словарь, а не тензор. В `train.py`
   усреднять значения через `mean_loss`, иначе callback падает с `'dict' object
   has no attribute 'mean'`.
