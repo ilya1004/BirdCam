@@ -17,6 +17,8 @@ public sealed class AppSettings
 
     public RecordingSettings Recording { get; set; } = new();
 
+    public TrainingSettings Training { get; set; } = new();
+
     public AppSettings Clone()
         => JsonSerializer.Deserialize<AppSettings>(JsonSerializer.Serialize(this)) ?? new AppSettings();
 }
@@ -98,6 +100,35 @@ public sealed class RecordingSettings
 
     /// <summary>Путь к ffmpeg.exe. Если пусто — ищется в PATH и папке winget.</summary>
     public string FfmpegPath { get; set; } = string.Empty;
+}
+
+public sealed class TrainingSettings
+{
+    /// <summary>Python с ultralytics. Пусто — автопоиск (.tools/venv, training/venv, PATH, py launcher).</summary>
+    public string PythonPath { get; set; } = string.Empty;
+
+    /// <summary>Названия классов по индексу, по одному на строку. Для текущего датасета — «синица».</summary>
+    public string ClassNames { get; set; } = "синица";
+
+    /// <summary>Доля кадров для валидации, %. Сплит делается по времени: последние кадры уходят в val.</summary>
+    public int ValidationPercent { get; set; } = 20;
+
+    /// <summary>Базовая .pt-модель: имя для автозагрузки ultralytics или абсолютный путь.</summary>
+    public string BaseModel { get; set; } = "yolo26n.pt";
+
+    public int Epochs { get; set; } = 40;
+
+    public int ImageSize { get; set; } = 640;
+
+    public int Batch { get; set; } = 8;
+
+    public int Workers { get; set; } = 2;
+
+    /// <summary>Устройство обучения: cpu или индекс CUDA (например, 0).</summary>
+    public string Device { get; set; } = "cpu";
+
+    /// <summary>Экспортировать best.onnx сразу после обучения.</summary>
+    public bool ExportOnnx { get; set; } = true;
 }
 
 

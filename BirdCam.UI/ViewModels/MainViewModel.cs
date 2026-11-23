@@ -9,17 +9,20 @@ public sealed partial class MainViewModel : ObservableObject
 {
     private readonly GalleryViewModel _gallery;
     private readonly DatasetViewModel _dataset;
+    private readonly TrainingViewModel _training;
 
     public MainViewModel(
         LiveViewModel live,
         GalleryViewModel gallery,
         DatasetViewModel dataset,
+        TrainingViewModel training,
         SettingsViewModel settings,
         StatusService status)
     {
         Live = live;
         _gallery = gallery;
         _dataset = dataset;
+        _training = training;
         Settings = settings;
         Status = status;
 
@@ -28,6 +31,7 @@ public sealed partial class MainViewModel : ObservableObject
             new NavigationItem("📹", "Прямой эфир", "live"),
             new NavigationItem("🖼️", "Галерея", "gallery"),
             new NavigationItem("📊", "Датасет", "dataset"),
+            new NavigationItem("🎓", "Обучение", "training"),
             new NavigationItem("⚙️", "Настройки", "settings")
         ];
 
@@ -47,6 +51,8 @@ public sealed partial class MainViewModel : ObservableObject
     public GalleryViewModel Gallery => _gallery;
 
     public DatasetViewModel Dataset => _dataset;
+
+    public TrainingViewModel Training => _training;
 
     public SettingsViewModel Settings { get; }
 
@@ -79,6 +85,7 @@ public sealed partial class MainViewModel : ObservableObject
         {
             "gallery" => _gallery,
             "dataset" => _dataset,
+            "training" => _training,
             "settings" => Settings,
             _ => Live
         };
@@ -90,6 +97,12 @@ public sealed partial class MainViewModel : ObservableObject
                 break;
             case "dataset":
                 _ = _dataset.RefreshAsync();
+                break;
+            case "training":
+                _ = _training.RefreshAsync();
+                break;
+            case "settings":
+                Settings.Reload();
                 break;
         }
     }

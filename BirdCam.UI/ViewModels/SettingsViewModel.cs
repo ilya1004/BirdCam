@@ -53,6 +53,14 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     public string ModelStatus => _detector.Status;
 
+    /// <summary>Перечитывает настройки из провайдера (например, после установки модели из обучения).</summary>
+    public void Reload()
+    {
+        LoadFrom(_settings.Current);
+        RefreshAvailableModels();
+        OnPropertyChanged(nameof(ModelStatus));
+    }
+
     [ObservableProperty]
     private string _rtspUrl = string.Empty;
 
@@ -210,7 +218,8 @@ public sealed partial class SettingsViewModel : ObservableObject
                 {
                     ClipDurationSeconds = Math.Clamp(ClipDurationSeconds, 3, 120),
                     FfmpegPath = Clean(FfmpegPath)
-                }
+                },
+                Training = previous.Training ?? new TrainingSettings()
             };
 
             await _settings.SaveAsync(settings);

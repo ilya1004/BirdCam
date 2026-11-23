@@ -370,7 +370,8 @@ public sealed partial class LiveViewModel : ObservableObject, IDisposable
         dispatcher.BeginInvoke(new Action(() =>
         {
             Detections = observation.Birds.ToArray();
-            LastEventText = $"{observation.Timestamp.ToLocalTime():HH:mm:ss} · птиц: {observation.Birds.Count}";
+            var best = observation.Birds.MaxBy(bird => bird.Confidence);
+            LastEventText = $"{observation.Timestamp.ToLocalTime():HH:mm:ss} · {best?.Label ?? "птица"} · объектов: {observation.Birds.Count}";
             LastSnapshotPath = observation.ImagePath;
             LastSnapshot = ImageLoader.Load(observation.ImagePath);
             TodayBirds += observation.Birds.Count;

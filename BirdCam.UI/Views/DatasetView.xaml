@@ -60,25 +60,26 @@
                     <TextBlock TextWrapping="Wrap" LineHeight="20" Foreground="{StaticResource TextBrush}">
                         Каждый пример сохраняется в трёх видах: полный кадр (`images`), разметка YOLO (`labels`)
                         и кроп с птицей (`crops`) — кропы удобны для обучения классификатора видов.
-                        Разметка пишется с классом 0 = bird, координаты нормализованы.
+                        Разметка пишется с классом 0 = bird; на вкладке «Обучение» он получает название вида
+                        (например, «синица»), а кадры делятся на train/val.
                     </TextBlock>
 
                     <TextBlock Text="Путь к датасету" Style="{StaticResource Muted}" Margin="0,16,0,4" />
                     <TextBox Text="{Binding DatasetPath, Mode=OneWay}" IsReadOnly="True" />
 
-                    <TextBlock Text="Дообучение (пример команды)" Style="{StaticResource H2}" Margin="0,20,0,8" />
+                    <TextBlock Text="Дообучение" Style="{StaticResource H2}" Margin="0,20,0,8" />
                     <Border Background="#0B0E13" CornerRadius="8" Padding="12">
                         <TextBlock FontFamily="Cascadia Mono, Consolas"
                                    FontSize="12"
                                    Foreground="#BFE9D3"
                                    TextWrapping="Wrap"
-                                   xml:space="preserve">yolo detect train data=dataset/data.yaml model=yolo11n.pt epochs=80 imgsz=640
-yolo export model=runs/detect/train/weights/best.pt format=onnx opset=17</TextBlock>
+                                   xml:space="preserve">yolo detect train data=%LOCALAPPDATA%\BirdCam\dataset\data.yaml model=yolo26n.pt epochs=40 imgsz=640
+yolo export model=runs/detect/train/weights/best.pt format=onnx opset=18</TextBlock>
                     </Border>
 
                     <TextBlock TextWrapping="Wrap" LineHeight="20" Margin="0,14,0,0" Style="{StaticResource Muted}">
-                        После экспорта положите best.onnx в папку models и укажите его в настройках.
-                        Для своей модели класс птицы обычно 0 — поменяйте «Классы птиц» на 0.
+                        Проще — на вкладке «Обучение»: она сама готовит train.txt/val.txt, запускает ultralytics
+                        и устанавливает best.onnx. После установки класс птицы должен быть 0.
                         Папка data.yaml создаётся автоматически при первом примере.
                     </TextBlock>
                 </StackPanel>

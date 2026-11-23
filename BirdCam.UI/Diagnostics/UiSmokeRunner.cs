@@ -26,6 +26,7 @@ internal static class UiSmokeRunner
                 (new LiveView(), services.GetRequiredService<LiveViewModel>()),
                 (new GalleryView(), services.GetRequiredService<GalleryViewModel>()),
                 (new DatasetView(), services.GetRequiredService<DatasetViewModel>()),
+                (new TrainingView(), services.GetRequiredService<TrainingViewModel>()),
                 (new SettingsView(), services.GetRequiredService<SettingsViewModel>())
             };
 
@@ -41,7 +42,7 @@ internal static class UiSmokeRunner
             {
                 SourceWidth = 1920,
                 SourceHeight = 1080,
-                Items = new[] { new DetectedBird("bird", 0.9, new BoundingBox(0.4, 0.4, 0.2, 0.2)) }
+                Items = new[] { new DetectedBird("синица", 0.9, new BoundingBox(0.4, 0.4, 0.2, 0.2)) }
             };
 
             overlay.Measure(new Size(960, 540));

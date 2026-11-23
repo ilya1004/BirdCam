@@ -35,11 +35,54 @@ public sealed class YoloLabelsTests
     }
 
     [Fact]
-    public void CreateDataYaml_UsesForwardSlashesAndClassZero()
+    public void CreateDataYaml_IsPortableAndUsesClassZero()
     {
-        var yaml = YoloLabels.CreateDataYaml(@"C:\data\birdcam\dataset");
+        var yaml = YoloLabels.CreateDataYaml("images", "images", ["bird"]);
 
-        Assert.Contains("path: C:/data/birdcam/dataset", yaml);
-        Assert.Contains("0: bird", yaml);
+        Assert.Contains("train: 'images'", yaml);
+        Assert.Contains("val: 'images'", yaml);
+        Assert.Contains("0: 'bird'", yaml);
+        Assert.DoesNotContain("path:", yaml);
+    }
+
+    [Fact]
+    public void CreateDataYaml_WritesExplicitSplitAndClassNames()
+    {
+        var yaml = YoloLabels.CreateDataYaml("train.txt", "val.txt", ["синица", "воробей"]);
+
+        Assert.Contains("train: 'train.txt'", yaml);
+        Assert.Contains("val: 'val.txt'", yaml);
+        Assert.Contains("0: 'синица'", yaml);
+        Assert.Contains("1: 'воробей'", yaml);
+    }
+
+    [Fact]
+    public void ParseNames_ReadsUltralyticsMetadata()
+    {
+        const string metadata = "{0: 'person', 1: 'bicycle', 14: 'bird', 79: 'toothbrush'}";
+
+        var names = YoloLabels.ParseNames(metadata);
+
+        Assert.Equal("person", names[0]);
+        Assert.Equal("bird", names[14]);
+        Assert.Equal("toothbrush", names[79]);
+    }
+
+    [Fact]
+    public void ParseNames_ReadsCyrillicAndDoubleQuotes()
+    {
+        var names = YoloLabels.ParseNames("{0: 'синица', 1: \"воробей\"}");
+
+        Assert.Equal("синица", names[0]);
+        Assert.Equal("воробей", names[1]);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("not a dict")]
+    public void ParseNames_ReturnsEmptyForMissingMetadata(string? metadata)
+    {
+        Assert.Empty(YoloLabels.ParseNames(metadata));
     }
 }

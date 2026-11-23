@@ -164,7 +164,8 @@ public sealed class BirdWatcher : IBirdWatcher
                     }
                     else
                     {
-                        _status = $"птица: {birds.Max(bird => bird.Confidence).ToString("P0", CultureInfo.CurrentCulture)}";
+                        var best = birds.MaxBy(bird => bird.Confidence)!;
+                        _status = $"{best.Label}: {best.Confidence.ToString("P0", CultureInfo.CurrentCulture)}";
 
                         var now = _timeProvider.GetUtcNow();
                         var cooldown = TimeSpan.FromSeconds(Math.Max(1, settings.Detection.CooldownSeconds));
@@ -253,10 +254,27 @@ public sealed class BirdWatcher : IBirdWatcher
 
     private static string BuildCaption(IReadOnlyList<DetectedBird> birds, DateTimeOffset localNow)
     {
-        var best = birds.Max(bird => bird.Confidence);
+        var bestBird = birds.MaxBy(bird => bird.Confidence)!;
+        var best = bestBird.Confidence;
         var count = birds.Count == 1 ? "1 птица" : $"{birds.Count} объектов";
+        var title = string.Equals(bestBird.Label, "птица", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(bestBird.Label, "bird", StringComparison.OrdinalIgnoreCase)
+            ? "Птица у кормушки"
+            : Capitalize(bestBird.Label) + " у кормушки";
+
         return string.Create(
             CultureInfo.CurrentCulture,
-            $"🐦 Птица у кормушки\nУверенность: {best:P0}\n{count}\n{localNow:dd.MM.yyyy HH:mm:ss}");
+            $"🐦 {title}\nУверенность: {best:P0}\n{count}\n{localNow:dd.MM.yyyy HH:mm:ss}");
+    }
+
+    private static string Capitalize(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "Птица";
+        }
+
+        var trimmed = value.Trim();
+        return char.ToUpper(trimmed[0], CultureInfo.CurrentCulture) + trimmed[1..];
     }
 }

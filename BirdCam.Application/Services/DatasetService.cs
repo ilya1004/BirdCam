@@ -99,11 +99,10 @@ public sealed class DatasetService : IDatasetService
             return;
         }
 
-        var datasetPath = _storage.GetAbsolutePath(StoragePaths.Dataset);
         await _storage.SaveTextAsync(
             StoragePaths.Dataset,
             "data.yaml",
-            YoloLabels.CreateDataYaml(datasetPath),
+            YoloLabels.CreateDataYaml("images", "images", ["bird"]),
             cancellationToken);
     }
 }

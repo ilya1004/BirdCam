@@ -8,6 +8,7 @@ using BirdCam.Infrastructure.Persistence.Repositories;
 using BirdCam.Infrastructure.Recording;
 using BirdCam.Infrastructure.Storage;
 using BirdCam.Infrastructure.Telegram;
+using BirdCam.Infrastructure.Training;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -37,6 +38,8 @@ public static class DependencyInjection
         services.AddSingleton<IFrameSource, OpenCvFrameSource>();
         services.AddSingleton<IDetector, OnnxBirdDetector>();
         services.AddSingleton<IGo2RtcManager, Go2RtcManager>();
+        services.AddSingleton<ITrainingDataService, TrainingDataService>();
+        services.AddSingleton<ITrainingRunner, UltralyticsTrainingRunner>();
 
         return services;
     }

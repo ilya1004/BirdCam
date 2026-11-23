@@ -30,6 +30,7 @@ public sealed class OnnxBirdDetector : IDetector, IDisposable
     private DenseTensor<float>? _tensor;
     private byte[]? _pixelBytes;
     private string _provider = "CPU";
+    private IReadOnlyDictionary<int, string> _classNames = new Dictionary<int, string>();
 
     public OnnxBirdDetector(ISettingsProvider settings, StorageLayout layout, ILogger<OnnxBirdDetector> logger)
     {
@@ -93,6 +94,7 @@ public sealed class OnnxBirdDetector : IDetector, IDisposable
             _session = null;
             _tensor = null;
             _pixelBytes = null;
+            _classNames = new Dictionary<int, string>();
             IsAvailable = false;
             Status = "загрузка модели…";
 
@@ -107,6 +109,7 @@ public sealed class OnnxBirdDetector : IDetector, IDisposable
             }
 
             _session = CreateSession(path, detection.UseGpu, out _provider);
+            _classNames = ReadClassNames(_session);
             _inputName = _session.InputMetadata.Keys.First();
             var dimensions = _session.InputMetadata[_inputName].Dimensions;
             _inputSize = dimensions.Length >= 3 && dimensions[2] > 0 ? dimensions[2] : detection.InputSize;
@@ -234,11 +237,11 @@ public sealed class OnnxBirdDetector : IDetector, IDisposable
         }
 
         var values = denseOutput.Buffer.Span;
-        var candidates = new List<(BoundingBox Box, double Confidence)>();
+        var candidates = new List<(BoundingBox Box, double Confidence, int ClassId)>();
         for (var index = 0; index < count; index++)
         {
             var bestScore = 0f;
-            var matched = false;
+            var bestClassId = -1;
 
             foreach (var classId in classIds)
             {
@@ -255,11 +258,11 @@ public sealed class OnnxBirdDetector : IDetector, IDisposable
                 if (score > bestScore)
                 {
                     bestScore = score;
-                    matched = true;
+                    bestClassId = classId;
                 }
             }
 
-            if (!matched || bestScore < threshold)
+            if (bestClassId < 0 || bestScore < threshold)
             {
                 continue;
             }
@@ -280,7 +283,7 @@ public sealed class OnnxBirdDetector : IDetector, IDisposable
                 continue;
             }
 
-            candidates.Add((box, bestScore));
+            candidates.Add((box, bestScore, bestClassId));
         }
 
         if (candidates.Count == 0)
@@ -293,9 +296,44 @@ public sealed class OnnxBirdDetector : IDetector, IDisposable
         var kept = Nms.Select(boxes, scores, NmsThreshold);
 
         return kept
-            .Select(index => new DetectedBird("bird", candidates[index].Confidence, candidates[index].Box))
+            .Select(index =>
+            {
+                var candidate = candidates[index];
+                return new DetectedBird(
+                    ResolveLabel(candidate.ClassId),
+                    candidate.Confidence,
+                    candidate.Box);
+            })
             .OrderByDescending(bird => bird.Confidence)
             .ToList();
+    }
+
+    private string ResolveLabel(int classId)
+    {
+        if (!_classNames.TryGetValue(classId, out var name) || string.IsNullOrWhiteSpace(name))
+        {
+            return "птица";
+        }
+
+        name = name.Trim();
+        return string.Equals(name, "bird", StringComparison.OrdinalIgnoreCase) ? "птица" : name;
+    }
+
+    private static IReadOnlyDictionary<int, string> ReadClassNames(InferenceSession session)
+    {
+        try
+        {
+            if (session.ModelMetadata.CustomMetadataMap.TryGetValue("names", out var names))
+            {
+                return YoloLabels.ParseNames(names);
+            }
+        }
+        catch (Exception)
+        {
+            // metadata необязательна
+        }
+
+        return new Dictionary<int, string>();
     }
 
     private string ResolveModelPath(string configured)

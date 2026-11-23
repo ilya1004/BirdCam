@@ -78,7 +78,7 @@ public sealed class DetectionOverlay : FrameworkElement
 
             var label = string.Create(
                 CultureInfo.CurrentCulture,
-                $"bird {bird.Confidence:P0}");
+                $"{bird.Label} {bird.Confidence:P0}");
 
             var text = new FormattedText(
                 label,

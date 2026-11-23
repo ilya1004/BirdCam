@@ -35,6 +35,15 @@ public sealed class StorageLayout
 
     public string Models => Path.Combine(Root, "models");
 
+    /// <summary>Рабочая папка обучения: скрипт, окружение, журналы и запуски.</summary>
+    public string Training => Path.Combine(Root, "training");
+
+    public string TrainingRuns => Path.Combine(Training, "runs");
+
+    public string TrainingLogs => Path.Combine(Training, "logs");
+
+    public string TrainingVenv => Path.Combine(Training, "venv");
+
     public string Logs => Path.Combine(Root, "logs");
 
     public string Database => Path.Combine(Root, "birdcam.db");
@@ -49,6 +58,9 @@ public sealed class StorageLayout
         Directory.CreateDirectory(DatasetLabels);
         Directory.CreateDirectory(DatasetCrops);
         Directory.CreateDirectory(Models);
+        Directory.CreateDirectory(Training);
+        Directory.CreateDirectory(TrainingRuns);
+        Directory.CreateDirectory(TrainingLogs);
         Directory.CreateDirectory(Logs);
     }
 }

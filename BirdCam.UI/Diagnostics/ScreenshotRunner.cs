@@ -13,7 +13,7 @@ namespace BirdCam.UI.Diagnostics;
 /// <summary>Оффскрин-рендер страницы в PNG (для документации и визуальных проверок).</summary>
 internal static class ScreenshotRunner
 {
-    public static int Run(IServiceProvider services, StorageLayout layout, string page, string outputPath)
+    public static async Task<int> RunAsync(IServiceProvider services, StorageLayout layout, string page, string outputPath)
     {
         try
         {
@@ -30,6 +30,10 @@ internal static class ScreenshotRunner
                     view = new DatasetView();
                     viewModel = services.GetRequiredService<DatasetViewModel>();
                     break;
+                case "training":
+                    view = new TrainingView();
+                    viewModel = services.GetRequiredService<TrainingViewModel>();
+                    break;
                 case "live":
                     view = new LiveView();
                     viewModel = services.GetRequiredService<LiveViewModel>();
@@ -38,6 +42,11 @@ internal static class ScreenshotRunner
                     view = new SettingsView();
                     viewModel = services.GetRequiredService<SettingsViewModel>();
                     break;
+            }
+
+            if (viewModel is TrainingViewModel training)
+            {
+                await training.EnsureLoadedAsync();
             }
 
             view.DataContext = viewModel;

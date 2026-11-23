@@ -48,6 +48,7 @@ public partial class App : System.Windows.Application
         builder.Services.AddSingleton<LiveViewModel>();
         builder.Services.AddSingleton<GalleryViewModel>();
         builder.Services.AddSingleton<DatasetViewModel>();
+        builder.Services.AddSingleton<TrainingViewModel>();
         builder.Services.AddSingleton<SettingsViewModel>();
         builder.Services.AddSingleton<MainViewModel>();
         builder.Services.AddSingleton<MainWindow>();
@@ -62,11 +63,22 @@ public partial class App : System.Windows.Application
             var detector = _host.Services.GetRequiredService<IDetector>();
             await detector.InitializeAsync();
 
+            if (e.Args.Contains("--training-check", StringComparer.OrdinalIgnoreCase))
+            {
+                var trainingCode = await Diagnostics.TrainingCheckRunner.RunAsync(
+                    _host.Services,
+                    layout,
+                    settingsProvider.Current,
+                    e.Args);
+                Shutdown(trainingCode);
+                return;
+            }
+
             var screenshotPage = GetOption(e.Args, "--screenshot");
             var screenshotPath = GetOption(e.Args, "--out");
             if (!string.IsNullOrWhiteSpace(screenshotPage) && !string.IsNullOrWhiteSpace(screenshotPath))
             {
-                var screenshotCode = Diagnostics.ScreenshotRunner.Run(_host.Services, layout, screenshotPage, screenshotPath);
+                var screenshotCode = await Diagnostics.ScreenshotRunner.RunAsync(_host.Services, layout, screenshotPage, screenshotPath);
                 Shutdown(screenshotCode);
                 return;
             }

@@ -13,6 +13,7 @@ public static class DependencyInjection
         services.AddSingleton<IClipService, ClipService>();
         services.AddSingleton<MediaLibraryService>();
         services.AddSingleton<IBirdWatcher, BirdWatcher>();
+        services.AddSingleton<ITrainingService, TrainingService>();
 
         return services;
     }
